@@ -101,7 +101,8 @@ export type SecretStoreOptions = {
 /** The secret store of this machine, or one that refuses on every call. */
 export function secretStore(options: SecretStoreOptions = {}): SecretStore {
   const platform = options.platform ?? process.platform;
-  const run = options.run ?? spawnRunner;
+  const run: SecretStoreRunner =
+    options.run ?? (async (file, args, input) => await spawnRunner(platform, file, args, input));
   const env = options.env ?? process.env;
   const installed = options.installed ?? ((file: string) => binaryInstalled(file, env));
   if (platform === "darwin") return keychainStore(platform, run);
@@ -337,7 +338,9 @@ function windowsDataProtectionStore(
     ].join("\n");
 
   const execute = async (script: string): Promise<SecretStoreOutcome> => {
-    const result = await run(powershell, WINDOWS_POWERSHELL_ARGS, `${script}\n`);
+    // PowerShell reads stdin like a prompt: a multi-line block only runs once a
+    // blank line closes it. Without one it exits 0 and has done nothing.
+    const result = await run(powershell, WINDOWS_POWERSHELL_ARGS, `${script}\n\n`);
     requirePowerShell(result);
     return result;
   };
@@ -546,8 +549,16 @@ function withoutTrailingNewline(value: string): string {
  * flag an interactive `vapi unlock` or `vapi login` would stop at the keychain
  * tool's own "password data for new item" prompt and store whatever the user
  * typed there instead of the value the client wrote to the pipe.
+ *
+ * Windows has no controlling terminal to escape, and there the flag starts the
+ * child with no console: PowerShell then exits 0 without running its script.
  */
-const spawnRunner: SecretStoreRunner = async (file, args, input) =>
+const spawnRunner = async (
+  platform: NodeJS.Platform,
+  file: string,
+  args: readonly string[],
+  input?: string,
+): Promise<SecretStoreOutcome> =>
   await new Promise<SecretStoreOutcome>((resolve) => {
     let stdout = "";
     let stderr = "";
@@ -558,7 +569,7 @@ const spawnRunner: SecretStoreRunner = async (file, args, input) =>
       resolve(outcome);
     };
     const child = spawn(file, [...args], {
-      detached: true,
+      detached: platform !== "win32",
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });

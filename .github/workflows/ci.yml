@@ -47,6 +47,31 @@ jobs:
       - name: Verify publish tarballs
         run: pnpm pack:check
 
+  windows:
+    name: Secret store (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test against Windows PowerShell and DPAPI
+        run: pnpm --filter @vapi-network/core exec vitest run src/secret-store.windows.test.ts
+
   desktop:
     name: vAPI Desktop (macOS)
     runs-on: macos-15

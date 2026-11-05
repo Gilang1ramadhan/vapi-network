@@ -179,6 +179,19 @@ describe("the Windows DPAPI store", () => {
     expect(runs[0]!.input).not.toContain(value);
   });
 
+  it("ends every script with a blank line, without which PowerShell never runs it", async () => {
+    const { run, runs } = recordingRunner([]);
+    const store = secretStore({ platform: "win32", run, env, installed });
+
+    await store.get("main");
+    await store.has("main");
+    await store.set("main", "test-only-passphrase");
+    await store.remove("main");
+
+    expect(runs).toHaveLength(4);
+    for (const { input } of runs) expect(input).toMatch(/\}\n\n$/u);
+  });
+
   it("reads the value back by decoding the script's base64 output", async () => {
     const value = "pässwörd ✓";
     const encoded = Buffer.from(value, "utf8").toString("base64");
