@@ -47,4 +47,21 @@ describe("the default secret-store runner", () => {
       expect.stringContaining("correct horse"),
     );
   });
+
+  it("keeps PowerShell attached on Windows, where a detached one never runs the script", async () => {
+    spawnMock.mockClear();
+    spawnMock.mockImplementation(() => fakeChild());
+
+    await secretStore({
+      platform: "win32",
+      env: { SystemRoot: "C:\\Windows" },
+      installed: () => true,
+    }).has("main");
+
+    expect(spawnMock.mock.calls[0]?.[2]).toMatchObject({
+      detached: false,
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  });
 });
