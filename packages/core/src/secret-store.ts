@@ -337,7 +337,9 @@ function windowsDataProtectionStore(
     ].join("\n");
 
   const execute = async (script: string): Promise<SecretStoreOutcome> => {
-    const result = await run(powershell, WINDOWS_POWERSHELL_ARGS, `${script}\n`);
+    // PowerShell reads stdin like a prompt: a multi-line block only runs once a
+    // blank line closes it. Without one it exits 0 and has done nothing.
+    const result = await run(powershell, WINDOWS_POWERSHELL_ARGS, `${script}\n\n`);
     requirePowerShell(result);
     return result;
   };
